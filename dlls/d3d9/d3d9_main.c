@@ -69,7 +69,7 @@ static BOOL try_native(void)
 
     if (appkey) RegCloseKey( appkey );
     if (defkey) RegCloseKey( defkey );
-
+    printf("Trynative: %d\n",data);
     return data ? TRUE : FALSE;
 }
 
@@ -81,9 +81,12 @@ IDirect3D9 * WINAPI DECLSPEC_HOTPATCH Direct3DCreate9(UINT sdk_version)
 
     if (try_native()) {
         IDirect3D9 *native;
+	printf("Native..\n");
         if (SUCCEEDED(d3dadapter9_new(FALSE, (IDirect3D9Ex **)&native))) {
+	     printf("Success\n");	
             return native;
-        }
+	}	
+	printf("Native failed\n");
     }
 
     if (!(object = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*object))))
@@ -96,7 +99,7 @@ IDirect3D9 * WINAPI DECLSPEC_HOTPATCH Direct3DCreate9(UINT sdk_version)
         return NULL;
     }
 
-    TRACE("Created d3d9 object %p.\n", object);
+    printf("Created d3d9 object %p.\n", object);
 
     return (IDirect3D9 *)&object->IDirect3D9Ex_iface;
 }
@@ -108,7 +111,9 @@ HRESULT WINAPI DECLSPEC_HOTPATCH Direct3DCreate9Ex(UINT sdk_version, IDirect3D9E
     TRACE("sdk_version %#x, d3d9ex %p.\n", sdk_version, d3d9ex);
 
     if (try_native()) {
-        if (SUCCEEDED(d3dadapter9_new(TRUE, d3d9ex))) { return D3D_OK; }
+printf("Native..\n");
+        if (SUCCEEDED(d3dadapter9_new(TRUE, d3d9ex))) { printf("Success\n"); return D3D_OK; }
+printf("Native failed\n");
     }
 
     if (!(object = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*object))))
@@ -121,7 +126,7 @@ HRESULT WINAPI DECLSPEC_HOTPATCH Direct3DCreate9Ex(UINT sdk_version, IDirect3D9E
         return D3DERR_NOTAVAILABLE;
     }
 
-    TRACE("Created d3d9 object %p.\n", object);
+    printf("Created d3d9 object %p.\n", object);
     *d3d9ex = &object->IDirect3D9Ex_iface;
 
     return D3D_OK;

@@ -630,6 +630,7 @@ fill_groups( struct d3dadapter9 *This )
     dm.dmSize = sizeof(dm);
 
     for (i = 0; EnumDisplayDevicesW(NULL, i, &dd, 0); ++i) {
+	printf("Dis device\n");
         struct adapter_group *group = add_group(This);
         if (!group) {
             ERR("Out of memory.\n");
@@ -639,7 +640,7 @@ fill_groups( struct d3dadapter9 *This )
         hdc = CreateDCW(wdisp, dd.DeviceName, NULL, NULL);
         if (!hdc) {
             remove_group(This);
-            WARN("Unable to create DC for display %d.\n", i);
+            printf("Unable to create DC for display %d.\n", i);
             goto end_group;
         }
 
@@ -647,6 +648,7 @@ fill_groups( struct d3dadapter9 *This )
         DeleteDC(hdc);
         if (FAILED(hr)) {
             remove_group(This);
+printf("Failed hdc\n");
             goto end_group;
         }
 
@@ -685,7 +687,7 @@ fill_groups( struct d3dadapter9 *This )
 
                     default:
                         remove_mode(This);
-                        WARN("Unknown format (%u bpp) in display %d, monitor "
+                        printf("Unknown format (%u bpp) in display %d, monitor "
                              "%d, mode %d.\n", dm.dmBitsPerPel, i, j, k);
                         goto end_mode;
                 }
@@ -710,7 +712,7 @@ fill_groups( struct d3dadapter9 *This )
 
                         default:
                             remove_output(This);
-                            WARN("Unknown display rotation in display %d, "
+                            printf("Unknown display rotation in display %d, "
                                  "monitor %d\n", i, j);
                             goto end_output;
                     }
@@ -723,7 +725,7 @@ fill_groups( struct d3dadapter9 *This )
                     out->monitor = MonitorFromPoint(pt, 0);
                     if (!out->monitor) {
                         remove_output(This);
-                        WARN("Unable to get monitor handle for display %d, "
+                        printf("Unable to get monitor handle for display %d, "
                              "monitor %d.\n", i, j);
                         goto end_output;
                     }
@@ -847,7 +849,7 @@ d3dadapter9_new( boolean ex,
     This->ex = ex;
 
     if (!load_adapter_funcs(This)) {
-        WARN("Your display driver doesn't support native D3D9 adapters.\n");
+        printf("Your display driver doesn't support native D3D9 adapters.\n");
         d3dadapter9_Release(This);
         return D3DERR_NOTAVAILABLE;
     }
@@ -859,13 +861,15 @@ d3dadapter9_new( boolean ex,
     }
 
     /* map absolute adapter IDs with internal adapters */
+printf("ngroups=%d\n",This->ngroups);
+
     for (i = k = 0; i < This->ngroups; ++i) {
         for (j = 0; j < This->groups[i].noutputs; ++j) {
             This->nadapters++;
         }
     }
     if (This->nadapters == 0) {
-        WARN("No available native adapters in system.\n");
+        printf("No available native adapters in system.\n");
         d3dadapter9_Release(This);
         return D3DERR_NOTAVAILABLE;
     }

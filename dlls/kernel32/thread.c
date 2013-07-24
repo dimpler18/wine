@@ -364,7 +364,7 @@ BOOL WINAPI SetThreadPriorityBoost(
     HANDLE hthread, /* [in] Handle to thread */
     BOOL disable)   /* [in] TRUE to disable priority boost */
 {
-    return TRUE;
+    return TRUE; //fake success
 }
 
 
