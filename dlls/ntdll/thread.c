@@ -1051,7 +1051,7 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
                 {
                     req->handle  = wine_server_obj_handle( handle );
                     req->flags   = server_flags;
-                    req->suspend = 1;
+                    req->suspend = 0;
                     wine_server_set_reply( req, &server_context, sizeof(server_context) );
                     ret = wine_server_call( req );
                 }
