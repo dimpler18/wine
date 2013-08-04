@@ -1701,6 +1701,22 @@ todo_wine
     ok(sock != INVALID_SOCKET, "WSASocketA should have succeeded\n");
     closesocket(sock);
 
+    /* SOCK_STREAM does not support IPPROTO_UDP */
+    SetLastError(0xdeadbeef);
+    ok(WSASocketA(AF_INET, SOCK_STREAM, IPPROTO_UDP, NULL, 0, 0) == INVALID_SOCKET,
+       "WSASocketA should have failed\n");
+    err = WSAGetLastError();
+todo_wine
+    ok(err == WSAEPROTONOSUPPORT, "Expected 10043, received %d\n", err);
+
+    /* SOCK_DGRAM does not support IPPROTO_TCP */
+    SetLastError(0xdeadbeef);
+    ok(WSASocketA(AF_INET, SOCK_DGRAM, IPPROTO_TCP, NULL, 0, 0) == INVALID_SOCKET,
+       "WSASocketA should have failed\n");
+    err = WSAGetLastError();
+todo_wine
+    ok(err == WSAEPROTONOSUPPORT, "Expected 10043, received %d\n", err);
+
     /* Set pi_size explicitly to a value below 2*sizeof(WSAPROTOCOL_INFOA)
      * to avoid a crash on win98.
      */
@@ -1733,7 +1749,33 @@ todo_wine
                       FROM_PROTOCOL_INFO, &pi[0], 0, 0);
     ok(sock != INVALID_SOCKET, "Failed to create socket: %d\n",
             WSAGetLastError());
+    closesocket(sock);
 
+    /* find what parameters are used first: plain parameters or protocol info struct */
+    pi[0].iProtocol = IPPROTO_UDP;
+    pi[0].iSocketType = SOCK_DGRAM;
+    pi[0].iAddressFamily = AF_INET;
+    sock = WSASocketA(0, 0, 0, &pi[0], 0, 0);
+todo_wine {
+    ok(sock != INVALID_SOCKET, "Failed to create socket: %d\n",
+            WSAGetLastError());
+    size = sizeof(socktype);
+    socktype = 0xdead;
+    err = getsockopt(sock, SOL_SOCKET, SO_TYPE, (char *) &socktype, &size);
+    ok(!err,"getsockopt failed with %d\n", WSAGetLastError());
+    ok(socktype == SOCK_DGRAM, "Wrong socket type, expected %d received %d\n",
+       SOCK_DGRAM, socktype);
+    closesocket(sock);
+}
+    sock = WSASocketA(AF_INET, SOCK_STREAM, IPPROTO_TCP, &pi[0], 0, 0);
+    ok(sock != INVALID_SOCKET, "Failed to create socket: %d\n",
+            WSAGetLastError());
+    size = sizeof(socktype);
+    socktype = 0xdead;
+    err = getsockopt(sock, SOL_SOCKET, SO_TYPE, (char *) &socktype, &size);
+    ok(!err,"getsockopt failed with %d\n", WSAGetLastError());
+    ok(socktype == SOCK_STREAM, "Wrong socket type, expected %d received %d\n",
+       SOCK_STREAM, socktype);
     closesocket(sock);
 
     HeapFree(GetProcessHeap(), 0, pi);
@@ -1757,7 +1799,9 @@ todo_wine
     ok(items != SOCKET_ERROR, "WSAEnumProtocolsA failed, last error is %d\n",
             WSAGetLastError());
 
-    /* when no protocol is specified the first socket type from WSAEnumProtocols is returned */
+    /* when no protocol and socket type are specified the first entry
+     * from WSAEnumProtocols that has the flag PFL_MATCHES_PROTOCOL_ZERO
+     * is returned */
     sock = WSASocketA(AF_INET, 0, 0, NULL, 0, 0);
 todo_wine
     ok(sock != INVALID_SOCKET, "Failed to create socket: %d\n",
@@ -1766,14 +1810,23 @@ todo_wine
 todo_wine {
     size = sizeof(socktype);
     socktype = 0xdead;
-    ok(!getsockopt(sock, SOL_SOCKET, SO_TYPE, (char *) &socktype, &size), "getsockopt failed with %d\n",
-       WSAGetLastError());
-    ok(socktype == pi[0].iSocketType, "Wrong socket type, expected %d received %d\n",
-       pi[0].iSocketType, socktype);
+    err = getsockopt(sock, SOL_SOCKET, SO_TYPE, (char *) &socktype, &size);
+    ok(!err, "getsockopt failed with %d\n", WSAGetLastError());
+    for(i = 0; i < items; i++)
+    {
+        if(pi[i].dwProviderFlags & PFL_MATCHES_PROTOCOL_ZERO)
+        {
+            ok(socktype == pi[i].iSocketType, "Wrong socket type, expected %d received %d\n",
+               pi[i].iSocketType, socktype);
+             break;
+        }
+    }
+    ok(i != items, "Creating a socket without protocol and socket type didn't work\n");
 }
     closesocket(sock);
 
-    /* when the protocol is specified the first socket type that matches the protocol is returned */
+    /* when no socket type is specified the first entry from WSAEnumProtocols
+     * that matches the protocol is returned */
     for (i = 0; i < sizeof(autoprotocols) / sizeof(autoprotocols[0]); i++)
     {
         sock = WSASocketA(0, 0, autoprotocols[i], NULL, 0, 0);
@@ -1783,22 +1836,25 @@ todo_wine
 
         size = sizeof(socktype);
         socktype = 0xdead;
+        err = getsockopt(sock, SOL_SOCKET, SO_TYPE, (char *) &socktype, &size);
 todo_wine
-        ok(!getsockopt(sock, SOL_SOCKET, SO_TYPE, (char *) &socktype, &size), "getsockopt failed with %d\n",
-           WSAGetLastError());
+        ok(!err, "getsockopt failed with %d\n", WSAGetLastError());
 
-        for (j = 0; j < items; j++)
+        for (err = 1, j = 0; j < items; j++)
         {
             if (pi[j].iProtocol == autoprotocols[i])
             {
+                if (socktype == pi[j].iSocketType)
+                    err = 0;
+                else
 todo_wine
-                ok(socktype == pi[j].iSocketType, "Wrong socket type, expected %d received %d\n",
-                   pi[j].iSocketType, socktype);
+                    ok(0, "Wrong socket type, expected %d received %d\n",
+                       pi[j].iSocketType, socktype);
                 break;
             }
         }
 todo_wine
-        ok(socktype != 0xdead, "Protocol %d not found in WSAEnumProtocols\n", autoprotocols[i]);
+        ok(!err, "Protocol %d not found in WSAEnumProtocols\n", autoprotocols[i]);
 
         closesocket(sock);
     }
@@ -2508,14 +2564,16 @@ static void test_listen(void)
     ok (ret == WSAEINVAL, "expected 10022, received %d\n", ret);
 
     acceptc = 0xdead;
-    ok (!getsockopt(fdA, SOL_SOCKET, SO_ACCEPTCONN, (char*)&acceptc, &olen), "getsockopt failed\n");
+    ret = getsockopt(fdA, SOL_SOCKET, SO_ACCEPTCONN, (char*)&acceptc, &olen);
+    ok (!ret, "getsockopt failed\n");
     ok (acceptc == 0, "SO_ACCEPTCONN should be 0, received %d\n", acceptc);
 
     ok (!listen(fdA, 0), "listen failed\n");
     ok (!listen(fdA, SOMAXCONN), "double listen failed\n");
 
     acceptc = 0xdead;
-    ok (!getsockopt(fdA, SOL_SOCKET, SO_ACCEPTCONN, (char*)&acceptc, &olen), "getsockopt failed\n");
+    ret = getsockopt(fdA, SOL_SOCKET, SO_ACCEPTCONN, (char*)&acceptc, &olen);
+    ok (!ret, "getsockopt failed\n");
     ok (acceptc == 1, "SO_ACCEPTCONN should be 1, received %d\n", acceptc);
 
     SetLastError(0xdeadbeef);
