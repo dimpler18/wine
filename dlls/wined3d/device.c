@@ -4753,6 +4753,7 @@ BOOL CDECL wined3d_device_show_cursor(struct wined3d_device *device, BOOL show)
      * When ShowCursor is first called it should make the cursor appear at the OS's last
      * known cursor position.
      */
+
     if (show && !oldVisible)
     {
         POINT pt;

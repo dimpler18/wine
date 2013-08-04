@@ -1508,6 +1508,7 @@ DECL_HANDLER(get_apc_result)
 /* retrieve the current context of a thread */
 DECL_HANDLER(get_thread_context)
 {
+printf("GetCTXServ\n");
     struct thread *thread;
     context_t *context;
 
@@ -1524,12 +1525,14 @@ DECL_HANDLER(get_thread_context)
         /* thread is not suspended, retry (if it's still running) */
         if (thread->state == RUNNING)
         {
+	    printf("Not suspended\n");
             set_error( STATUS_PENDING );
             if (req->suspend)
             {
                 release_object( thread );
                 /* make sure we have suspend access */
                 if (!(thread = get_thread_from_handle( req->handle, THREAD_SUSPEND_RESUME ))) return;
+		printf("Try suspend\n");
                 suspend_thread( thread );
             }
         }

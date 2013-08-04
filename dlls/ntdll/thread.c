@@ -1021,7 +1021,7 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
     DWORD dummy, i;
     DWORD needed_flags = context->ContextFlags;
     BOOL self = (handle == GetCurrentThread());
-
+    printf("GetCTXThread %d Thread:%08x\n",self,handle);
 #ifdef __i386__
     /* on i386 debug registers always require a server call */
     if (context->ContextFlags & (CONTEXT_DEBUG_REGISTERS & ~CONTEXT_i386)) self = FALSE;
@@ -1051,7 +1051,7 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
                 {
                     req->handle  = wine_server_obj_handle( handle );
                     req->flags   = server_flags;
-                    req->suspend = 0;
+                    req->suspend = 1;
                     wine_server_set_reply( req, &server_context, sizeof(server_context) );
                     ret = wine_server_call( req );
                 }
@@ -1063,9 +1063,10 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
                     NtDelayExecution( FALSE, &timeout );
                 }
                 else break;
+		printf("Try\n");
             }
             NtResumeThread( handle, &dummy );
-            if (ret == STATUS_PENDING) ret = STATUS_ACCESS_DENIED;
+            if (ret == STATUS_PENDING) {ret = STATUS_SUCCESS /*HACK*/;printf("Access Denied\n");}
         }
         if (!ret) ret = context_from_server( context, &server_context );
         if (ret) return ret;
